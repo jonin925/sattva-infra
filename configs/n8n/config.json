@@ -1,0 +1,30 @@
+{
+  "executions": {
+    "process": "main",
+    "mode": "regular",
+    "saveDataOnSuccess": "all",
+    "saveDataOnError": "all",
+    "saveExecutionProgress": true,
+    "pruneData": true,
+    "pruneDataMaxAge": 168,
+    "pruneDataTimeout": 3600,
+    "pruneDataMaxCount": 10000
+  },
+  "generic": {
+    "timezone": "UTC"
+  },
+  "security": {
+    "basicAuth": {
+      "active": true
+    }
+  },
+  "endpoints": {
+    "rest": true,
+    "webhook": true,
+    "webhookWaiting": true,
+    "webhookTest": true
+  },
+  "publicApi": {
+    "disabled": false
+  }
+}

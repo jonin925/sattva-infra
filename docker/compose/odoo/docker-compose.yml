@@ -1,0 +1,70 @@
+services:
+  odoo-init:
+    image: odoo:17.0
+    command: >
+      odoo 
+      --init base,crm,sale,purchase,stock,account
+      --database odoo_db
+      --db_host infra-postgres
+      --db_user odoo_app
+      --db_password ${ODOO_DB_PASSWORD}
+      --stop-after-init
+      --without-demo=all
+    volumes:
+      - type: bind
+        source: ./configs/odoo/odoo.conf
+        target: /etc/odoo/odoo.conf
+        read_only: true
+      - type: bind
+        source: ./portal/odoo-modules/satva_portal
+        target: /mnt/extra-addons/satva_portal
+        read_only: true
+    networks:
+      - backend-internal
+    depends_on:
+      infra-postgres:
+        condition: service_healthy
+    profiles: ["init"]
+
+  odoo:
+    image: odoo:17.0
+    environment:
+      HOST: infra-postgres
+      USER: odoo_app
+      PASSWORD: ${ODOO_DB_PASSWORD}
+      DATABASE: odoo_db
+    volumes:
+      - type: bind
+        source: ./configs/odoo/odoo.conf
+        target: /etc/odoo/odoo.conf
+        read_only: true
+      - type: bind
+        source: ./portal/odoo-modules/satva_portal
+        target: /mnt/extra-addons/satva_portal
+        read_only: true
+      - type: bind
+        source: /srv/docker/volumes/odoo/filestore
+        target: /var/lib/odoo/filestore
+      - type: bind
+        source: /srv/docker/volumes/odoo/sessions
+        target: /var/lib/odoo/sessions
+    networks:
+      - backend-internal
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.odoo.rule=Host(`odoo.localhost`)"
+      - "traefik.http.routers.odoo.entrypoints=websecure"
+      - "traefik.http.routers.odoo.tls.certResolver=mkcert"
+      - "traefik.http.routers.odoo.middlewares=security-headers@file,rate-limit@file"
+      - "traefik.http.services.odoo.loadbalancer.server.port=8069"
+      - "traefik.http.services.odoo.loadbalancer.healthcheck.path=/web/health"
+    depends_on:
+      infra-postgres:
+        condition: service_healthy
+
+networks:
+  backend-internal:
+    external: true
+  traefik-public:
+    external: true

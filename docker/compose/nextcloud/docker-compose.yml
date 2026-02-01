@@ -1,0 +1,46 @@
+services:
+  nextcloud:
+    image: nextcloud:28-apache
+    environment:
+      POSTGRES_HOST: infra-postgres
+      POSTGRES_DB: nextcloud_db
+      POSTGRES_USER: nextcloud_app
+      POSTGRES_PASSWORD: ${NEXTCLOUD_DB_PASSWORD}
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER:-admin}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
+      NEXTCLOUD_TRUSTED_DOMAINS: nextcloud.localhost
+      OVERWRITEPROTOCOL: https
+      OVERWRITEHOST: nextcloud.localhost
+      REDIS_HOST: infra-redis
+      REDIS_HOST_PORT: 6379
+    volumes:
+      - type: bind
+        source: /srv/docker/volumes/nextcloud/html
+        target: /var/www/html
+      - type: bind
+        source: /srv/docker/volumes/nextcloud/data
+        target: /var/www/html/data
+      - type: bind
+        source: ./configs/nextcloud/php.ini
+        target: /usr/local/etc/php/conf.d/99-custom.ini
+    networks:
+      - backend-internal
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.localhost`)"
+      - "traefik.http.routers.nextcloud.entrypoints=websecure"
+      - "traefik.http.routers.nextcloud.tls.certResolver=mkcert"
+      - "traefik.http.routers.nextcloud.middlewares=security-headers@file,rate-limit@file"
+      - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+    depends_on:
+      infra-postgres:
+        condition: service_healthy
+      infra-redis:
+        condition: service_healthy
+
+networks:
+  backend-internal:
+    external: true
+  traefik-public:
+    external: true

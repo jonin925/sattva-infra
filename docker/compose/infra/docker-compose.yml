@@ -1,0 +1,69 @@
+services:
+  postgres:
+    image: postgres:15.4-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - type: bind
+        source: /srv/docker/volumes/postgres/data
+        target: /var/lib/postgresql/data
+      - type: bind
+        source: ./init-scripts
+        target: /docker-entrypoint-initdb.d
+      - type: bind
+        source: ./configs/postgres/postgresql.conf
+        target: /etc/postgresql/postgresql.conf
+    networks:
+      - backend-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@localhost}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - type: bind
+        source: /srv/docker/volumes/pgadmin
+        target: /var/lib/pgadmin
+      - type: bind
+        source: ./configs/pgadmin/servers.json
+        target: /pgadmin4/servers.json
+    networks:
+      - backend-internal
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pgadmin.rule=Host(`pgadmin.localhost`)"
+      - "traefik.http.routers.pgadmin.entrypoints=websecure"
+      - "traefik.http.routers.pgadmin.tls.certResolver=mkcert"
+      - "traefik.http.routers.pgadmin.middlewares=security-headers@file,basic-auth@file"
+      - "traefik.http.services.pgadmin.loadbalancer.server.port=80"
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - type: bind
+        source: /srv/docker/volumes/redis/data
+        target: /data
+    networks:
+      - backend-internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  backend-internal:
+    external: true
+  traefik-public:
+    external: true

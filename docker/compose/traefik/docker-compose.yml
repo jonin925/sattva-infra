@@ -1,0 +1,47 @@
+services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--providers.docker.network=traefik-public"
+      - "--providers.file.filename=/dynamic.yml"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesResolvers.mkcert.acme.tlsChallenge=false"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+      - type: bind
+        source: ./security/traefik/dynamic.yml
+        target: /dynamic.yml
+      - type: bind
+        source: ./security/traefik/certs
+        target: /certs
+    networks:
+      - traefik-public
+      - backend-internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certResolver=mkcert"
+      - "traefik.http.routers.traefik.middlewares=security-headers@file,basic-auth@file"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+networks:
+  traefik-public:
+    external: true
+  backend-internal:
+    external: true

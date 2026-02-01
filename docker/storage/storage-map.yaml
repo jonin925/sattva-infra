@@ -1,0 +1,123 @@
+# =============================================================================
+# AI-Brokerage-Infra Storage Mapping: Docker Volume Strategy
+# =============================================================================
+
+storage_map:
+  version: "1.0"
+  last_updated: "2026-02-01"
+
+  # ---------------------------------------------------------------------------
+  # Named Volumes: Docker-Managed, Local Driver
+  # ---------------------------------------------------------------------------
+  named_volumes:
+    # None in prototype — bind mounts preferred for host visibility
+
+  # ---------------------------------------------------------------------------
+  # Bind Mounts: Host Path with Explicit Ownership
+  # ---------------------------------------------------------------------------
+  bind_mounts:
+    # PostgreSQL: Database Files (Critical: 999:999 ownership)
+    postgres_data:
+      host_path: /srv/docker/volumes/postgres/data
+      container_path: /var/lib/postgresql/data
+      owner_uid: 999
+      owner_gid: 999
+      mode: "0700"
+      purpose: "PostgreSQL data files, WAL, configuration"
+      backup_strategy: "pg_dump logical + WAL archive"
+      size_estimate: "10GB initial, 50GB growth"
+
+    # pgAdmin: User Settings and Server Definitions
+    pgadmin_data:
+      host_path: /srv/docker/volumes/pgadmin
+      container_path: /var/lib/pgadmin
+      owner_uid: 5050
+      owner_gid: 5050
+      mode: "0755"
+      purpose: "pgAdmin configuration, saved queries"
+      backup_strategy: "file copy"
+      size_estimate: "1GB"
+
+    # Redis: Persistence and Cache
+    redis_data:
+      host_path: /srv/docker/volumes/redis/data
+      container_path: /data
+      owner_uid: 999
+      owner_gid: 999
+      mode: "0755"
+      purpose: "Redis AOF/RDB persistence"
+      backup_strategy: "RDB snapshot copy"
+      size_estimate: "5GB"
+
+    # n8n: Workflows, Credentials, Executions
+    n8n_data:
+      host_path: /srv/docker/volumes/n8n/.n8n
+      container_path: /home/node/.n8n
+      owner_uid: 1000
+      owner_gid: 1000
+      mode: "0755"
+      purpose: "Workflow definitions, encrypted credentials, execution history"
+      backup_strategy: "restic incremental + workflow JSON export"
+      size_estimate: "5GB initial, 20GB with execution history"
+
+    # Nextcloud: Application Code (Immutable)
+    nextcloud_html:
+      host_path: /srv/docker/volumes/nextcloud/html
+      container_path: /var/www/html
+      owner_uid: 33
+      owner_gid: 33
+      mode: "0755"
+      purpose: "Nextcloud application code, apps, themes"
+      backup_strategy: "image-based restore (code), config export"
+      size_estimate: "2GB"
+
+    # Nextcloud: User Files (NAS-Backed PVC Simulation)
+    nextcloud_data:
+      host_path: /srv/docker/volumes/nextcloud/data
+      container_path: /var/www/html/data
+      owner_uid: 33
+      owner_gid: 33
+      mode: "0750"
+      purpose: "User files, versions, trash (simulates NAS-backed PVC)"
+      backup_strategy: "restic incremental + Nextcloud export"
+      size_estimate: "50GB initial, 200GB growth"
+
+    # Odoo: Attachments and Filestore
+    odoo_filestore:
+      host_path: /srv/docker/volumes/odoo/filestore
+      container_path: /var/lib/odoo/filestore
+      owner_uid: 101
+      owner_gid: 101
+      mode: "0755"
+      purpose: "Document attachments, generated reports"
+      backup_strategy: "restic incremental"
+      size_estimate: "10GB initial, 50GB growth"
+
+    # Odoo: Session Persistence
+    odoo_sessions:
+      host_path: /srv/docker/volumes/odoo/sessions
+      container_path: /var/lib/odoo/sessions
+      owner_uid: 101
+      owner_gid: 101
+      mode: "0755"
+      purpose: "User session files for multi-worker deployments"
+      backup_strategy: "none (ephemeral)"
+      size_estimate: "1GB"
+
+    # Traefik: TLS Certificates and ACME State
+    traefik_certs:
+      host_path: /srv/docker/volumes/traefik/certs
+      container_path: /certs
+      owner_uid: 0
+      owner_gid: 0
+      mode: "0755"
+      purpose: "mkcert CA, service certificates, ACME state"
+      backup_strategy: "encrypted archive"
+      size_estimate: "10MB"
+
+  # ---------------------------------------------------------------------------
+  # Volume Creation Script Reference
+  # ---------------------------------------------------------------------------
+  provisioning:
+    script: "scripts/mkvolumes.sh"
+    validation: "scripts/verify-volumes.sh"
