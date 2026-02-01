@@ -1,44 +1,39 @@
+version: "3.9"
+
 services:
   traefik:
     image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+
     command:
       - "--api.dashboard=true"
-      - "--api.insecure=false"
       - "--providers.docker=true"
-      - "--providers.docker.exposedByDefault=false"
-      - "--providers.docker.network=traefik-public"
-      - "--providers.file.filename=/dynamic.yml"
-      - "--providers.file.watch=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.directory=/etc/traefik/dynamic"
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
       - "--entrypoints.websecure.address=:443"
-      - "--certificatesResolvers.mkcert.acme.tlsChallenge=false"
+      - "--log.level=INFO"
+
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"
+
     volumes:
-      - type: bind
-        source: /var/run/docker.sock
-        target: /var/run/docker.sock
-        read_only: true
-      - type: bind
-        source: ./security/traefik/dynamic.yml
-        target: /dynamic.yml
-      - type: bind
-        source: ./security/traefik/certs
-        target: /certs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./security/traefik:/etc/traefik/dynamic
+      - ./security/traefik/certs:/certs
+
     networks:
       - traefik-public
       - backend-internal
+
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
-      - "traefik.http.routers.traefik.entrypoints=websecure"
-      - "traefik.http.routers.traefik.tls.certResolver=mkcert"
-      - "traefik.http.routers.traefik.middlewares=security-headers@file,basic-auth@file"
-      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.sattva.local`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.tls=true"
 
 networks:
   traefik-public:
